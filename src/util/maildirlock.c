@@ -34,9 +34,15 @@ static int maildir_lock(const char *path, unsigned int timeout,
 	return file_dotlock_create(&dotlock_settings, path, 0, dotlock_r);
 }
 
+static void dotlock_wait_end(struct ioloop *ioloop)
+{
+	io_loop_stop(ioloop);
+}
+
 int main(int argc, const char *argv[])
 {
 	struct dotlock *dotlock;
+	struct timeout *to;
 	unsigned int timeout;
 	pid_t pid;
 	int fd[2], ret;
@@ -95,7 +101,9 @@ int main(int argc, const char *argv[])
 	if (write_full(fd[1], "", 1) < 0)
 		i_fatal("write(pipe) failed: %m");
 
+	to = timeout_add(timeout * 1000, dotlock_wait_end, ioloop);
 	io_loop_run(ioloop);
+	timeout_remove(&to);
 
 	file_dotlock_delete(&dotlock);
 	lib_signals_deinit();
